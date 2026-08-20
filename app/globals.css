@@ -1,26 +1,87 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base canvas — neutral, not purple-tinted. Color is reserved for a few
+     deliberate spots (nav, primary actions, financial emphasis), not text. */
+  --background: #f3f2f5;
+  --foreground: #26232c;
+  --muted: #726e7c;
+  --border: rgba(38, 35, 44, 0.1);
+
+  /* Glass surfaces */
+  --surface: rgba(255, 255, 255, 0.62);
+  --surface-strong: rgba(255, 255, 255, 0.8);
+  --surface-border: rgba(255, 255, 255, 0.6);
+
+  /* Brand — two colors, two strict jobs. Purple: the sidebar rail only.
+     Cherry: buttons and financial-attention states only. Never mixed,
+     never decorative, never on text/links/data. */
+  --esque-plum: #5e3f7a;
+  --esque-plum-dark: #4a2f63;
+  --esque-red: #b23a5b;
+  --esque-red-dark: #93304b;
+  --esque-cream: #f5f1f8;
+
+  /* Sidebar — white glass, identical to every other surface. The only
+     color is the 4px rail on its outer edge. */
+  --sidebar-bg: rgba(255, 255, 255, 0.55);
+  --sidebar-fg: #2a2732;
+  --sidebar-muted: #726e7c;
+
+  /* Ambient wash — neutral gray, not brand-tinted. Just enough tonal
+     variation for the glass blur to read as glass. */
+  --glow-1: rgba(38, 35, 44, 0.05);
+  --glow-2: rgba(38, 35, 44, 0.035);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-surface-border: var(--surface-border);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand-plum: var(--esque-plum);
+  --color-brand-plum-dark: var(--esque-plum-dark);
+  --color-brand-red: var(--esque-red);
+  --color-brand-red-dark: var(--esque-red-dark);
+  --color-brand-cream: var(--esque-cream);
+
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-muted: var(--sidebar-muted);
+
+  --font-sans: var(--font-jakarta);
+  --font-display: var(--font-space-grotesk);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  position: relative;
+}
+
+/* Fixed, barely-there ambient wash behind the whole app — just enough for
+   the glass panels to have something to blur, not a colored backdrop. */
+.ambient-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(560px circle at 6% 4%, var(--glow-1), transparent 60%),
+    radial-gradient(480px circle at 97% 12%, var(--glow-2), transparent 60%);
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.01em;
 }
