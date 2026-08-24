@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { Button, Input, Label } from "@/components/ui";
-import { login } from "@/lib/actions/auth";
+import { signupEmployee } from "@/lib/actions/auth";
 
-export default async function LoginPage({
+export default async function SignupPage({
   searchParams,
-}: PageProps<"/login">) {
+}: PageProps<"/signup">) {
   const params = await searchParams;
   const error = typeof params.error === "string" ? params.error : undefined;
 
@@ -16,9 +16,10 @@ export default async function LoginPage({
           <Logo boxed={false} className="h-12 w-auto" />
         </div>
         <div className="rounded-2xl bg-surface backdrop-blur-xl border border-surface-border p-8 shadow-[0_16px_48px_-12px_rgba(38,35,44,0.16)]">
-          <h1 className="text-lg font-semibold text-foreground font-display">Sign in</h1>
+          <h1 className="text-lg font-semibold text-foreground font-display">Create your account</h1>
           <p className="mt-1 text-sm text-muted">
-            Internal portal — ESQUE team access only.
+            For ESQUE team members — use the email address already on file for you. You&apos;ll be
+            able to see your own monthly performance scorecard once signed in.
           </p>
 
           {error && (
@@ -27,29 +28,24 @@ export default async function LoginPage({
             </div>
           )}
 
-          <form action={login} className="mt-6 space-y-4">
+          <form action={signupEmployee} className="mt-6 space-y-4">
             <div>
               <Label>Email</Label>
               <Input type="email" name="email" required autoComplete="email" />
             </div>
             <div>
               <Label>Password</Label>
-              <Input
-                type="password"
-                name="password"
-                required
-                autoComplete="current-password"
-              />
+              <Input type="password" name="password" required minLength={6} autoComplete="new-password" />
             </div>
             <Button type="submit" className="w-full">
-              Sign in
+              Create account
             </Button>
           </form>
 
           <p className="mt-5 text-center text-xs text-muted">
-            Team member without an account?{" "}
-            <Link href="/signup" className="text-foreground underline">
-              Create one
+            Already have an account?{" "}
+            <Link href="/login" className="text-foreground underline">
+              Sign in
             </Link>
           </p>
         </div>

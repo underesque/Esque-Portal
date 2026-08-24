@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "staff";
+export type UserRole = "admin" | "staff" | "employee";
 
 export type ClientStatus = "active" | "inactive" | "prospect";
 
@@ -122,7 +122,23 @@ export interface Profile {
   id: string;
   full_name: string;
   role: UserRole;
+  employee_id: string | null;
   created_at: string;
+}
+
+export interface MonthlyScorecard {
+  id: string;
+  employee_id: string;
+  period_start: string;
+  period_end: string;
+  attendance_score: number;
+  punctuality_score: number;
+  work_performance_score: number;
+  manager_feedback_score: number;
+  responsiveness_score: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type FounderRole = "sales" | "operations" | "partner";

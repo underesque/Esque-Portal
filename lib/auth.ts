@@ -26,3 +26,9 @@ export async function requireAdmin() {
   if (profile.role !== "admin") redirect("/dashboard");
   return { user, profile };
 }
+
+export async function requireEmployee() {
+  const { user, profile } = await requireUser();
+  if (profile.role !== "employee" || !profile.employee_id) redirect("/dashboard");
+  return { user, profile, employeeId: profile.employee_id };
+}

@@ -12,26 +12,28 @@ import {
   Bell,
   CalendarDays,
   ClipboardList,
+  ClipboardCheck,
   LogOut,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { logout } from "@/lib/actions/auth";
 import type { UserRole } from "@/lib/types";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
-  { href: "/clients", label: "Clients", icon: Contact, adminOnly: false },
-  { href: "/employees", label: "Employees", icon: Users, adminOnly: true },
-  { href: "/payroll", label: "Payroll", icon: Wallet, adminOnly: true },
-  { href: "/vendors", label: "Vendors", icon: Building, adminOnly: true },
-  { href: "/notifications", label: "Notifications", icon: Bell, adminOnly: false },
-  { href: "/holidays", label: "Holidays", icon: CalendarDays, adminOnly: false },
-  { href: "/activity", label: "Activity Log", icon: ClipboardList, adminOnly: false },
+const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard; roles: UserRole[] }[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "staff"] },
+  { href: "/clients", label: "Clients", icon: Contact, roles: ["admin", "staff"] },
+  { href: "/employees", label: "Employees", icon: Users, roles: ["admin"] },
+  { href: "/payroll", label: "Payroll", icon: Wallet, roles: ["admin"] },
+  { href: "/vendors", label: "Vendors", icon: Building, roles: ["admin"] },
+  { href: "/my-scorecard", label: "My Scorecard", icon: ClipboardCheck, roles: ["employee"] },
+  { href: "/notifications", label: "Notifications", icon: Bell, roles: ["admin", "staff"] },
+  { href: "/holidays", label: "Holidays", icon: CalendarDays, roles: ["admin", "staff", "employee"] },
+  { href: "/activity", label: "Activity Log", icon: ClipboardList, roles: ["admin", "staff"] },
 ];
 
 export function Sidebar({ role, fullName }: { role: UserRole; fullName: string }) {
   const pathname = usePathname();
-  const items = NAV_ITEMS.filter((item) => !item.adminOnly || role === "admin");
+  const items = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
   return (
     <aside className="w-64 shrink-0 bg-sidebar-bg text-sidebar-fg backdrop-blur-2xl border-l-4 border-l-brand-plum border-r border-r-black/[0.06] shadow-[8px_0_32px_-16px_rgba(38,35,44,0.12)] flex flex-col h-full sticky top-0">

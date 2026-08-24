@@ -7,14 +7,22 @@ import { PageHeader, Card, Badge, Button, Input, Select, Textarea, Label, EmptyS
 import { formatINR, formatDate, titleCase } from "@/lib/format";
 import { updateEmployee } from "@/lib/actions/employees";
 import { addCommissionEntry, updateCommissionStatus } from "@/lib/actions/payroll";
-import type { CommissionEntry, Employee, PayrollRun } from "@/lib/types";
+import { saveMonthlyScorecard } from "@/lib/actions/scorecards";
+import { SCORECARD_CATEGORIES, calculateMonthlyScore, incrementPercentForYearlyScore } from "@/lib/scorecard";
+import type { CommissionEntry, Employee, MonthlyScorecard, PayrollRun } from "@/lib/types";
+
+function monthBounds(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
 
 export default async function EmployeeDetailPage({ params }: PageProps<"/employees/[id]">) {
   await requireAdmin();
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: employee }, { data: commissionEntries }, { data: payrollRuns }] = await Promise.all([
+  const [{ data: employee }, { data: commissionEntries }, { data: payrollRuns }, { data: scorecards }] = await Promise.all([
     supabase.from("employees").select("*").eq("id", id).single<Employee>(),
     supabase
       .from("commission_entries")
@@ -28,6 +36,12 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
       .eq("employee_id", id)
       .order("period_start", { ascending: false })
       .returns<PayrollRun[]>(),
+    supabase
+      .from("monthly_scorecards")
+      .select("*")
+      .eq("employee_id", id)
+      .order("period_start", { ascending: false })
+      .returns<MonthlyScorecard[]>(),
   ]);
 
   if (!employee) notFound();
@@ -35,6 +49,14 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
   const pendingCommissionCents = (commissionEntries ?? [])
     .filter((e) => e.status !== "paid")
     .reduce((sum, e) => sum + e.commission_amount_cents, 0);
+
+  const scorecardRows = scorecards ?? [];
+  const { start: defaultMonthStart, end: defaultMonthEnd } = monthBounds(new Date());
+  const existingForThisMonth = scorecardRows.find((s) => s.period_start === defaultMonthStart);
+  const currentYear = new Date().getFullYear();
+  const thisYearScores = scorecardRows.filter((s) => new Date(s.period_start).getFullYear() === currentYear);
+  const yearlyScore =
+    thisYearScores.length > 0 ? thisYearScores.reduce((sum, s) => sum + calculateMonthlyScore(s), 0) / thisYearScores.length : null;
 
   return (
     <div>
@@ -276,6 +298,80 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
               </table>
             ) : (
               <EmptyState message="No payroll runs processed yet." />
+            )}
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-foreground">Performance scorecard</h2>
+              {yearlyScore !== null && (
+                <span className="text-xs text-muted">
+                  {currentYear} avg {yearlyScore.toFixed(1)}% · {incrementPercentForYearlyScore(yearlyScore)}% increment tier
+                </span>
+              )}
+            </div>
+            <form
+              action={saveMonthlyScorecard.bind(null, employee.id)}
+              className="mb-5 space-y-3 rounded-lg border border-border p-4"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Period start</Label>
+                  <Input name="period_start" type="date" required defaultValue={defaultMonthStart} />
+                </div>
+                <div>
+                  <Label>Period end</Label>
+                  <Input name="period_end" type="date" required defaultValue={defaultMonthEnd} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {SCORECARD_CATEGORIES.map((c) => (
+                  <div key={c.key}>
+                    <Label>
+                      {c.label} ({Math.round(c.weight * 100)}%)
+                    </Label>
+                    <Input
+                      name={c.key}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      defaultValue={existingForThisMonth ? existingForThisMonth[c.key] : 100}
+                      required
+                    />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <Label>Notes</Label>
+                <Textarea name="notes" rows={2} defaultValue={existingForThisMonth?.notes ?? ""} />
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" variant="secondary">
+                  Save this month&apos;s scorecard
+                </Button>
+              </div>
+            </form>
+
+            {scorecardRows.length > 0 ? (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs font-medium uppercase text-muted">
+                    <th className="py-2">Month</th>
+                    <th className="py-2">Overall score</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {scorecardRows.map((s) => (
+                    <tr key={s.id}>
+                      <td className="py-2 text-foreground">{formatDate(s.period_start)}</td>
+                      <td className="py-2 font-medium text-foreground">{calculateMonthlyScore(s).toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <EmptyState message="No scorecards entered yet." />
             )}
           </Card>
         </div>

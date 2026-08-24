@@ -5,8 +5,9 @@ Internal client & employee management portal for ESQUE. Next.js 16 (App Router) 
 
 ## What's here
 
-- **Role-based access** — `admin` and `staff` roles stored in `profiles`. Admins see everything;
-  staff can manage clients/billing but cannot see employee compensation or payroll.
+- **Role-based access** — `admin`, `staff`, and `employee` roles stored in `profiles`. Admins see
+  everything; staff can manage clients/billing but cannot see employee compensation or payroll;
+  employees get their own login and can only ever see their own performance scorecard (see below).
 - **Client management** — client records, a communication timeline, invoices, and payment history.
 - **Employee management** — headcount roster, employment details, active/inactive overview.
 - **Salary & commission** — fixed, commission-only, or hybrid pay structures; commission entries
@@ -25,6 +26,13 @@ Internal client & employee management portal for ESQUE. Next.js 16 (App Router) 
   bills, a payroll-not-yet-run reminder, draft invoices that still need to be sent, and client
   invoices coming due or overdue. Nothing is stored — it's derived from current data on load.
 - **Holiday calendar** — company holidays, visible to everyone; admins add/remove them.
+- **Performance scorecards** — monthly scores across five weighted categories (Attendance 10%,
+  Punctuality 10%, Work Performance 50%, Manager Feedback 10%, Responsiveness 20%), entered by
+  admins on each employee's detail page. Employees sign up at `/signup` with the email already on
+  file for them, which auto-links their account (read-only) to their own scorecard at
+  `/my-scorecard` — never anyone else's. A yearly average maps to the salary-increment tiers from
+  the Growth Policy (100% → 25%, 95–99% → 20%, 90–94% → 15%, 80–89% → 10%, 75–79% → 7%,
+  70–74% → 5%).
 - **Dashboard** — client count, revenue collected, pending invoices, payroll summary (admin), and
   a recent activity feed.
 - **Activity log** — every create/update/status-change is recorded with who did it and when.
@@ -32,10 +40,12 @@ Internal client & employee management portal for ESQUE. Next.js 16 (App Router) 
 ## Setup
 
 1. **Create a Supabase project** at [supabase.com](https://supabase.com).
-2. **Run the migrations** in `supabase/migrations/`, in order (`0001_init.sql` then
-   `0002_founders_vendors_holidays.sql`) — paste each into the Supabase SQL Editor and run it (or
-   use the Supabase CLI: `supabase db push`). Together they create every table, enum, and Row
-   Level Security policy the app needs.
+2. **Run the migrations** in `supabase/migrations/`, in numeric order (`0001` through `0005`) —
+   paste each into the Supabase SQL Editor and run it (or use the Supabase CLI: `supabase db
+   push`). Together they create every table, enum, and Row Level Security policy the app needs.
+   `0004` and `0005` must run as two separate statements/scripts, in that order — Postgres won't
+   let a brand-new enum value (`0004` adds the `employee` role) be referenced in the same
+   transaction it was created in, which `0005` does.
 3. **Copy environment variables**:
    ```bash
    cp .env.local.example .env.local
@@ -57,21 +67,30 @@ Internal client & employee management portal for ESQUE. Next.js 16 (App Router) 
 ## Project structure
 
 - `app/(portal)/` — authenticated pages (dashboard, clients, employees, payroll, founders,
-  vendors, notifications, holidays, activity), wrapped by a shared sidebar layout.
-- `app/login/` — sign-in page (public).
+  vendors, notifications, holidays, activity, my-scorecard), wrapped by a shared sidebar layout
+  that filters nav items by role.
+- `app/login/`, `app/signup/` — sign-in (admin/staff/employee) and employee self-signup, both
+  public.
 - `lib/actions/` — Server Actions for every mutation (clients, billing, employees, payroll,
-  founders, vendors, holidays, auth).
+  founders, vendors, holidays, scorecards, auth).
+- `lib/scorecard.ts` — the scorecard weights and increment tiers, shared by the admin-entry UI and
+  the employee's own view so both always agree.
 - `lib/supabase/` — Supabase client factories for the browser, server components, and the proxy.
-- `proxy.ts` — gates every route behind auth and restricts `/employees`, `/payroll`, `/founders`,
-  and `/vendors` to admins.
+- `proxy.ts` — gates every route behind auth; restricts `/employees`, `/payroll`, `/founders`, and
+  `/vendors` to admins; and restricts the `employee` role to only `/my-scorecard` and `/holidays`.
 - `supabase/migrations/` — the full database schema.
 
 ## Notes on access control
 
 Access is enforced in three places, so a hole in one layer doesn't expose data:
 
-1. `proxy.ts` redirects non-admins away from `/employees`, `/payroll`, `/founders`, and `/vendors`.
-2. Server Actions call `requireAdmin()` before any employee/payroll/founder/vendor mutation.
-3. Row Level Security policies on `employees`, `commission_rules`, `commission_entries`,
-   `payroll_runs`, `founder_assignments`, `distribution_runs`, `distribution_shares`, and
-   `vendors` restrict access to admins at the database level regardless of what the app does.
+1. `proxy.ts` redirects non-admins away from `/employees`, `/payroll`, `/founders`, and
+   `/vendors`, and redirects the `employee` role away from everything except `/my-scorecard` and
+   `/holidays`.
+2. Server Actions call `requireAdmin()` (or `requireEmployee()` for the employee's own page) before
+   any protected mutation or read.
+3. Row Level Security policies restrict access at the database level regardless of what the app
+   does — `employees` can only be read in full by admin/staff, or by an employee for their own row;
+   `monthly_scorecards` can only be written by admins, and read by an employee only for their own
+   `employee_id`; `commission_rules`, `commission_entries`, `payroll_runs`, `founder_assignments`,
+   `distribution_runs`, `distribution_shares`, and `vendors` remain admin-only.
