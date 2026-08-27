@@ -66,6 +66,23 @@ export default async function NotificationsPage() {
   });
 
   if (isAdmin) {
+    // --- Projects blocked by the client -------------------------------------
+    const { data: blockedProjects } = await supabase
+      .from("projects")
+      .select("id, name, client_id, clients(name)")
+      .eq("status", "blocked_by_client");
+
+    (blockedProjects ?? []).forEach((p) => {
+      items.push({
+        id: `project-${p.id}`,
+        severity: "overdue",
+        icon: <AlertTriangle size={16} />,
+        title: `${p.name} is blocked by the client`,
+        detail: (p.clients as unknown as { name: string } | null)?.name ?? "Client",
+        href: `/projects/${p.id}`,
+      });
+    });
+
     // --- Vendor bills due / overdue ---------------------------------------
     const { data: vendors } = await supabase
       .from("vendors")

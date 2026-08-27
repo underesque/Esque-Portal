@@ -40,6 +40,7 @@ export default async function EmployeesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase text-muted">
+                <th className="px-5 py-3">Employee ID</th>
                 <th className="px-5 py-3">Name</th>
                 <th className="px-5 py-3">Type</th>
                 <th className="px-5 py-3">Pay structure</th>
@@ -50,6 +51,7 @@ export default async function EmployeesPage() {
             <tbody className="divide-y divide-border">
               {employees.map((employee) => (
                 <tr key={employee.id} className="hover:bg-black/[0.02]">
+                  <td className="px-5 py-3 text-muted">{employee.employee_code ?? "—"}</td>
                   <td className="px-5 py-3">
                     <Link
                       href={`/employees/${employee.id}`}

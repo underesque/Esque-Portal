@@ -19,7 +19,7 @@ export default async function NewVendorPage() {
 
       <Card className="p-6 max-w-2xl">
         <form action={createVendor} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Vendor name</Label>
               <Input name="name" required />
@@ -43,7 +43,7 @@ export default async function NewVendorPage() {
               <Input name="contact_phone" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Billing frequency</Label>
               <Select name="billing_frequency" defaultValue="monthly">
@@ -59,7 +59,7 @@ export default async function NewVendorPage() {
               <Input name="amount" type="number" step="0.01" min="0" required />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Next due date</Label>
               <Input name="next_due_date" type="date" />

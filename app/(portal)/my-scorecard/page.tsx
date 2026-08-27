@@ -19,7 +19,7 @@ export default async function MyScorecardPage() {
 
   const rows = scorecards ?? [];
   const currentYear = new Date().getFullYear();
-  const thisYearRows = rows.filter((r) => new Date(r.period_start).getFullYear() === currentYear);
+  const thisYearRows = rows.filter((r) => Number(r.period_start.slice(0, 4)) === currentYear);
   const yearlyScore = thisYearRows.length > 0 ? thisYearRows.reduce((s, r) => s + calculateMonthlyScore(r), 0) / thisYearRows.length : null;
   const incrementPercent = yearlyScore !== null ? incrementPercentForYearlyScore(yearlyScore) : null;
 

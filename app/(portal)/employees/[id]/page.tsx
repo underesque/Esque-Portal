@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { PageHeader, Card, Badge, Button, Input, Select, Textarea, Label, EmptyState } from "@/components/ui";
 import { formatINR, formatDate, titleCase } from "@/lib/format";
 import { updateEmployee } from "@/lib/actions/employees";
 import { addCommissionEntry, updateCommissionStatus } from "@/lib/actions/payroll";
 import { saveMonthlyScorecard } from "@/lib/actions/scorecards";
 import { SCORECARD_CATEGORIES, calculateMonthlyScore, incrementPercentForYearlyScore } from "@/lib/scorecard";
-import type { CommissionEntry, Employee, MonthlyScorecard, PayrollRun } from "@/lib/types";
+import type { CommissionEntry, Employee, MonthlyScorecard, PayrollRun, ProjectAssignment } from "@/lib/types";
 
 function monthBounds(date: Date) {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -22,27 +23,33 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: employee }, { data: commissionEntries }, { data: payrollRuns }, { data: scorecards }] = await Promise.all([
-    supabase.from("employees").select("*").eq("id", id).single<Employee>(),
-    supabase
-      .from("commission_entries")
-      .select("*")
-      .eq("employee_id", id)
-      .order("created_at", { ascending: false })
-      .returns<CommissionEntry[]>(),
-    supabase
-      .from("payroll_runs")
-      .select("*")
-      .eq("employee_id", id)
-      .order("period_start", { ascending: false })
-      .returns<PayrollRun[]>(),
-    supabase
-      .from("monthly_scorecards")
-      .select("*")
-      .eq("employee_id", id)
-      .order("period_start", { ascending: false })
-      .returns<MonthlyScorecard[]>(),
-  ]);
+  const [{ data: employee }, { data: commissionEntries }, { data: payrollRuns }, { data: scorecards }, { data: projectAssignments }] =
+    await Promise.all([
+      supabase.from("employees").select("*").eq("id", id).single<Employee>(),
+      supabase
+        .from("commission_entries")
+        .select("*")
+        .eq("employee_id", id)
+        .order("created_at", { ascending: false })
+        .returns<CommissionEntry[]>(),
+      supabase
+        .from("payroll_runs")
+        .select("*")
+        .eq("employee_id", id)
+        .order("period_start", { ascending: false })
+        .returns<PayrollRun[]>(),
+      supabase
+        .from("monthly_scorecards")
+        .select("*")
+        .eq("employee_id", id)
+        .order("period_start", { ascending: false })
+        .returns<MonthlyScorecard[]>(),
+      supabase
+        .from("project_assignments")
+        .select("*, projects(id, name, status, clients(name))")
+        .eq("employee_id", id)
+        .returns<(ProjectAssignment & { projects: { id: string; name: string; status: string; clients: { name: string } | null } | null })[]>(),
+    ]);
 
   if (!employee) notFound();
 
@@ -54,7 +61,7 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
   const { start: defaultMonthStart, end: defaultMonthEnd } = monthBounds(new Date());
   const existingForThisMonth = scorecardRows.find((s) => s.period_start === defaultMonthStart);
   const currentYear = new Date().getFullYear();
-  const thisYearScores = scorecardRows.filter((s) => new Date(s.period_start).getFullYear() === currentYear);
+  const thisYearScores = scorecardRows.filter((s) => Number(s.period_start.slice(0, 4)) === currentYear);
   const yearlyScore =
     thisYearScores.length > 0 ? thisYearScores.reduce((sum, s) => sum + calculateMonthlyScore(s), 0) / thisYearScores.length : null;
 
@@ -79,6 +86,10 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
             <h2 className="text-sm font-semibold text-foreground mb-3">Edit employee</h2>
             <form action={updateEmployee.bind(null, employee.id)} className="space-y-3">
               <div>
+                <Label>Employee ID</Label>
+                <Input name="employee_code" placeholder="Assign later" defaultValue={employee.employee_code ?? ""} />
+              </div>
+              <div>
                 <Label>Full name</Label>
                 <Input name="full_name" defaultValue={employee.full_name} required />
               </div>
@@ -94,13 +105,13 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                 <Label>Start date</Label>
                 <Input name="start_date" type="date" defaultValue={employee.start_date} required />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Employment type</Label>
                   <Select name="employment_type" defaultValue={employee.employment_type}>
                     <option value="full_time">Full-time</option>
                     <option value="part_time">Part-time</option>
-                    <option value="contractor">Contractor</option>
+                    <option value="contractual">Contractual</option>
                   </Select>
                 </div>
                 <div>
@@ -119,7 +130,7 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                   <option value="hybrid">Fixed + commission</option>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Base salary (INR / yr)</Label>
                   <Input
@@ -140,6 +151,74 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                     max="100"
                     defaultValue={employee.commission_rate_percent}
                   />
+                </div>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <input type="checkbox" name="is_founder" defaultChecked={employee.is_founder} />
+                  Is a founder
+                </label>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Salary basis</Label>
+                    <Select name="salary_basis" defaultValue={employee.salary_basis}>
+                      <option value="full_time">Full-time (₹75,000 cap)</option>
+                      <option value="half_time">Half-time (₹40,000 cap)</option>
+                      <option value="hourly_director">Director hourly (₹500/hr)</option>
+                      <option value="custom">Custom</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Hours (if hourly)</Label>
+                    <Input
+                      name="salary_basis_hours"
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      defaultValue={employee.salary_basis_hours}
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Label>Custom monthly salary (INR, if basis is Custom)</Label>
+                  <Input
+                    name="salary_basis_custom"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={(employee.salary_basis_custom_cents / 100).toFixed(2)}
+                  />
+                </div>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <Label>T-shirt size</Label>
+                <Select name="t_shirt_size" defaultValue={employee.t_shirt_size ?? ""}>
+                  <option value="">— Not set —</option>
+                  <option value="XS">XS</option>
+                  <option value="S">S</option>
+                  <option value="M">M</option>
+                  <option value="L">L</option>
+                  <option value="XL">XL</option>
+                  <option value="XXL">XXL</option>
+                </Select>
+                <div className="mt-3 text-xs font-medium text-muted">Bank details</div>
+                <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Account holder</Label>
+                    <Input name="bank_account_holder" defaultValue={employee.bank_account_holder ?? ""} />
+                  </div>
+                  <div>
+                    <Label>Bank name</Label>
+                    <Input name="bank_name" defaultValue={employee.bank_name ?? ""} />
+                  </div>
+                  <div>
+                    <Label>Account number</Label>
+                    <Input name="bank_account_number" defaultValue={employee.bank_account_number ?? ""} />
+                  </div>
+                  <div>
+                    <Label>IFSC</Label>
+                    <Input name="bank_ifsc" defaultValue={employee.bank_ifsc ?? ""} />
+                  </div>
                 </div>
               </div>
               <div>
@@ -180,7 +259,7 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                 <Label>Description</Label>
                 <Input name="description" placeholder="e.g. Acme Co. deal closed" required />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Base amount (INR)</Label>
                   <Input name="base_amount" type="number" step="0.01" min="0" required />
@@ -198,7 +277,7 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Period start</Label>
                   <Input name="period_start" type="date" required />
@@ -246,16 +325,15 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                             );
                           }}
                         >
-                          <select
+                          <AutoSubmitSelect
                             name="status"
                             defaultValue={entry.status}
                             className="rounded-md border border-border bg-white px-2 py-1 text-xs"
-                            onChange={(e) => e.currentTarget.form?.requestSubmit()}
                           >
                             <option value="pending">Pending</option>
                             <option value="approved">Approved</option>
                             <option value="paid">Paid</option>
-                          </select>
+                          </AutoSubmitSelect>
                         </form>
                       </td>
                     </tr>
@@ -302,6 +380,40 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
           </Card>
 
           <Card className="p-5">
+            <h2 className="text-sm font-semibold text-foreground mb-3">Projects</h2>
+            {projectAssignments && projectAssignments.length > 0 ? (
+              <ul className="divide-y divide-border">
+                {projectAssignments.map((a) => {
+                  const amount =
+                    a.billing_type === "hourly" && a.hourly_rate_cents && a.hours
+                      ? Math.round(a.hourly_rate_cents * a.hours)
+                      : a.billing_type === "fixed_contract"
+                        ? a.fixed_contract_amount_cents
+                        : null;
+                  return (
+                    <li key={a.id} className="flex items-center justify-between py-2.5 text-sm">
+                      <span>
+                        {a.projects ? (
+                          <Link href={`/projects/${a.projects.id}`} className="font-medium text-foreground hover:underline">
+                            {a.projects.name}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}{" "}
+                        <span className="text-muted">({a.projects?.clients?.name ?? "—"})</span>
+                        {amount !== null && <span className="ml-2 text-xs text-muted">{formatINR(amount)}</span>}
+                      </span>
+                      {a.projects && <Badge status={a.projects.status} />}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyState message="Not assigned to any projects yet." />
+            )}
+          </Card>
+
+          <Card className="p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-foreground">Performance scorecard</h2>
               {yearlyScore !== null && (
@@ -314,7 +426,7 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
               action={saveMonthlyScorecard.bind(null, employee.id)}
               className="mb-5 space-y-3 rounded-lg border border-border p-4"
             >
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Period start</Label>
                   <Input name="period_start" type="date" required defaultValue={defaultMonthStart} />
@@ -324,7 +436,7 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                   <Input name="period_end" type="date" required defaultValue={defaultMonthEnd} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {SCORECARD_CATEGORIES.map((c) => (
                   <div key={c.key}>
                     <Label>

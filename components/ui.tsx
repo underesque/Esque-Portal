@@ -7,13 +7,13 @@ export function PageHeader({
   action,
 }: {
   title: string;
-  description?: string;
+  description?: ReactNode;
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground font-display">{title}</h1>
+    <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-semibold text-foreground font-display break-words">{title}</h1>
         {description && <p className="text-sm text-muted mt-1">{description}</p>}
       </div>
       {action}
@@ -25,7 +25,7 @@ export function Card({ children, className }: { children: ReactNode; className?:
   return (
     <div
       className={clsx(
-        "rounded-2xl border border-surface-border bg-surface backdrop-blur-xl shadow-[0_4px_24px_-8px_rgba(38,35,44,0.14)]",
+        "rounded-2xl border border-surface-border bg-surface backdrop-blur-xl shadow-[0_4px_24px_-8px_rgba(38,35,44,0.14)] overflow-x-auto",
         className
       )}
     >
@@ -64,6 +64,10 @@ const BADGE_STYLES: Record<string, string> = {
   inactive: "bg-black/5 text-foreground/60 ring-black/10",
   overdue: "bg-brand-red/10 text-brand-red-dark ring-brand-red/25",
   void: "bg-black/5 text-foreground/50 ring-black/10",
+  not_started: "bg-black/5 text-foreground/60 ring-black/10",
+  ongoing: "bg-sky-500/10 text-sky-700 ring-sky-600/20",
+  completed: "bg-emerald-500/10 text-emerald-700 ring-emerald-600/20",
+  blocked_by_client: "bg-brand-red/10 text-brand-red-dark ring-brand-red/25",
 };
 
 export function Badge({ status }: { status: string }) {
@@ -75,7 +79,7 @@ export function Badge({ status }: { status: string }) {
         style
       )}
     >
-      {status.replace("_", " ")}
+      {status.replaceAll("_", " ")}
     </span>
   );
 }

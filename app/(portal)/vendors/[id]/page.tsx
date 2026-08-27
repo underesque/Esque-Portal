@@ -27,7 +27,7 @@ export default async function VendorDetailPage({ params }: PageProps<"/vendors/[
 
       <Card className="p-6 max-w-2xl">
         <form action={updateVendor.bind(null, vendor.id)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Vendor name</Label>
               <Input name="name" defaultValue={vendor.name} required />
@@ -51,7 +51,7 @@ export default async function VendorDetailPage({ params }: PageProps<"/vendors/[
               <Input name="contact_phone" defaultValue={vendor.contact_phone ?? ""} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Billing frequency</Label>
               <Select name="billing_frequency" defaultValue={vendor.billing_frequency}>
@@ -74,7 +74,7 @@ export default async function VendorDetailPage({ params }: PageProps<"/vendors/[
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Next due date</Label>
               <Input name="next_due_date" type="date" defaultValue={vendor.next_due_date ?? ""} />

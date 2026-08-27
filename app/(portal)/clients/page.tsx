@@ -7,7 +7,7 @@ export default async function ClientsPage() {
   const supabase = await createClient();
   const { data: clients } = await supabase
     .from("clients")
-    .select("*, employees(full_name)")
+    .select("*, employees!sales_owner_id(full_name)")
     .order("created_at", { ascending: false })
     .returns<(Client & { employees: { full_name: string } | null })[]>();
 

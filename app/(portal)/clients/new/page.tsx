@@ -26,7 +26,7 @@ export default async function NewClientPage() {
 
       <Card className="p-6 max-w-2xl">
         <form action={createClientRecord} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Client name</Label>
               <Input name="name" required />
@@ -36,7 +36,7 @@ export default async function NewClientPage() {
               <Input name="email" type="email" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Business name</Label>
               <Input name="business_name" />
@@ -46,7 +46,7 @@ export default async function NewClientPage() {
               <Input name="business_website" placeholder="https://" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Phone</Label>
               <Input name="phone" />

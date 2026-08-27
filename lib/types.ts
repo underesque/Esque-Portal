@@ -1,6 +1,7 @@
 export type UserRole = "admin" | "staff" | "employee";
 
 export type ClientStatus = "active" | "inactive" | "prospect";
+export type InvoicePayoutType = "normal" | "hourly" | "bonus";
 
 export interface Client {
   id: string;
@@ -13,9 +14,33 @@ export interface Client {
   status: ClientStatus;
   notes: string | null;
   sales_owner_id: string | null;
+  ops_owner_id: string | null;
+  is_foundation_account: boolean;
+  default_payout_type: InvoicePayoutType;
+  fixed_payout_base_usd_cents: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type ClientPayoutSplitType = "sales" | "ops";
+
+export interface ClientPayoutSplit {
+  id: string;
+  client_id: string;
+  project_id: string | null;
+  split_type: ClientPayoutSplitType;
+  employee_id: string;
+  share_percent: number;
+  created_at: string;
+}
+
+export interface ClientAssignment {
+  id: string;
+  client_id: string;
+  employee_id: string;
+  role: string | null;
+  created_at: string;
 }
 
 export type CommunicationType = "email" | "call" | "meeting" | "note";
@@ -36,12 +61,18 @@ export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "void";
 export interface Invoice {
   id: string;
   client_id: string;
+  project_id: string | null;
   invoice_number: string;
   amount_cents: number;
   status: InvoiceStatus;
   issued_date: string;
   due_date: string | null;
   notes: string | null;
+  conversion_rate: number | null;
+  payout_type: InvoicePayoutType;
+  bonus_co_handler_employee_id: string | null;
+  bonus_handler_share_percent: number;
+  paid_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -57,12 +88,15 @@ export interface Payment {
   created_at: string;
 }
 
-export type EmploymentType = "full_time" | "part_time" | "contractor";
+export type EmploymentType = "full_time" | "part_time" | "contractual";
 export type EmployeeStatus = "active" | "inactive";
 export type PayType = "fixed" | "commission" | "hybrid";
+export type FounderSalaryBasis = "full_time" | "half_time" | "hourly_director" | "custom";
+export type TShirtSize = "XS" | "S" | "M" | "L" | "XL" | "XXL";
 
 export interface Employee {
   id: string;
+  employee_code: string | null;
   full_name: string;
   email: string | null;
   phone: string | null;
@@ -72,6 +106,15 @@ export interface Employee {
   pay_type: PayType;
   base_salary_cents: number;
   commission_rate_percent: number;
+  is_founder: boolean;
+  salary_basis: FounderSalaryBasis;
+  salary_basis_hours: number;
+  salary_basis_custom_cents: number;
+  bank_account_holder: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
+  t_shirt_size: TShirtSize | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -141,36 +184,31 @@ export interface MonthlyScorecard {
   updated_at: string;
 }
 
-export type FounderRole = "sales" | "operations" | "partner";
+export type PayoutShareCategory =
+  | "sales"
+  | "ops"
+  | "partner"
+  | "salary"
+  | "bonus"
+  | "foundation_excess"
+  | "client_excess";
 
-export interface FounderAssignment {
-  id: string;
-  employee_id: string;
-  role: FounderRole;
-  active: boolean;
-  created_at: string;
-}
-
-export interface DistributionRun {
+export interface PayoutRun {
   id: string;
   period_start: string;
   period_end: string;
-  revenue_usd_cents: number | null;
-  exchange_rate: number | null;
-  revenue_inr_cents: number;
-  total_salaries_inr_cents: number;
-  distributable_inr_cents: number;
-  company_retained_inr_cents: number;
-  notes: string | null;
-  created_at: string;
+  conversion_total_inr_cents: number;
+  esque_total_inr_cents: number;
+  foundation_excess_inr_cents: number;
+  computed_at: string;
 }
 
-export interface DistributionShare {
+export interface PayoutShare {
   id: string;
   run_id: string;
   employee_id: string;
-  role: FounderRole;
-  percent_of_pool: number;
+  category: PayoutShareCategory;
+  source_invoice_id: string | null;
   amount_inr_cents: number;
   created_at: string;
 }
@@ -200,5 +238,33 @@ export interface Holiday {
   date: string;
   recurring_annually: boolean;
   notes: string | null;
+  created_at: string;
+}
+
+export type ProjectStatus = "not_started" | "ongoing" | "completed" | "blocked_by_client";
+export type ProjectType = "monthly" | "one_time";
+
+export interface Project {
+  id: string;
+  client_id: string;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  project_type: ProjectType;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ProjectBillingType = "hourly" | "fixed_contract";
+
+export interface ProjectAssignment {
+  id: string;
+  project_id: string;
+  employee_id: string;
+  billing_type: ProjectBillingType | null;
+  hourly_rate_cents: number | null;
+  hours: number | null;
+  fixed_contract_amount_cents: number | null;
   created_at: string;
 }

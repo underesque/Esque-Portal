@@ -31,20 +31,20 @@ export default async function AnnualSalarySummaryPage({
 
   const supabase = await createClient();
 
-  const [{ data: employees }, { data: payrollRuns }, { data: distributionRuns }] = await Promise.all([
+  const [{ data: employees }, { data: payrollRuns }, { data: payoutRuns }] = await Promise.all([
     supabase.from("employees").select("id, full_name"),
     supabase
       .from("payroll_runs")
       .select("employee_id, base_amount_cents, commission_amount_cents, total_amount_cents")
       .gte("period_start", start)
       .lte("period_start", end),
-    supabase.from("distribution_runs").select("id").gte("period_start", start).lte("period_start", end),
+    supabase.from("payout_runs").select("id").gte("period_start", start).lte("period_start", end),
   ]);
 
-  const runIds = (distributionRuns ?? []).map((r) => r.id);
-  const { data: distributionShares } = runIds.length
+  const runIds = (payoutRuns ?? []).map((r) => r.id);
+  const { data: payoutShares } = runIds.length
     ? await supabase
-        .from("distribution_shares")
+        .from("payout_shares")
         .select("employee_id, amount_inr_cents")
         .in("run_id", runIds)
     : { data: [] };
@@ -66,7 +66,7 @@ export default async function AnnualSalarySummaryPage({
   (payrollRuns ?? []).forEach((r) => {
     getRow(r.employee_id).payrollCents += r.total_amount_cents;
   });
-  (distributionShares ?? []).forEach((s) => {
+  (payoutShares ?? []).forEach((s) => {
     getRow(s.employee_id).distributionCents += s.amount_inr_cents;
   });
 

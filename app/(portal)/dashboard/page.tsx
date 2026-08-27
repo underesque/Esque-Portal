@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
-import { PageHeader, Card, StatCard, EmptyState } from "@/components/ui";
-import { formatUSD, formatINR, formatDateTime } from "@/lib/format";
-import type { ActivityLogEntry } from "@/lib/types";
+import { PageHeader, StatCard } from "@/components/ui";
+import { formatUSD, formatINR } from "@/lib/format";
 
 export default async function DashboardPage() {
   const { profile } = await requireUser();
@@ -16,8 +15,6 @@ export default async function DashboardPage() {
     { data: payments },
     { data: openInvoices },
     { count: activeEmployees },
-    { count: inactiveEmployees },
-    { data: recentActivity },
   ] = await Promise.all([
     supabase.from("clients").select("id", { count: "exact", head: true }),
     supabase
@@ -33,15 +30,6 @@ export default async function DashboardPage() {
       .from("employees")
       .select("id", { count: "exact", head: true })
       .eq("status", "active"),
-    supabase
-      .from("employees")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "inactive"),
-    supabase
-      .from("activity_log")
-      .select("*, profiles(full_name)")
-      .order("created_at", { ascending: false })
-      .limit(8),
   ]);
 
   const totalRevenueCents = (payments ?? []).reduce((sum, p) => sum + p.amount_cents, 0);
@@ -88,47 +76,15 @@ export default async function DashboardPage() {
             value={payrollSummary ?? formatINR(0)}
           />
         ) : (
-          <StatCard
-            label="Employees"
-            value={String((activeEmployees ?? 0) + (inactiveEmployees ?? 0))}
-            hint={`${activeEmployees ?? 0} active`}
-          />
+          <StatCard label="Employees" value={String(activeEmployees ?? 0)} />
         )}
       </div>
 
       {isAdmin && (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mt-6 max-w-xs">
           <StatCard label="Active Employees" value={String(activeEmployees ?? 0)} />
-          <StatCard label="Inactive Employees" value={String(inactiveEmployees ?? 0)} />
         </div>
       )}
-
-      <div className="mt-8">
-        <h2 className="text-sm font-semibold text-foreground mb-3">Recent activity</h2>
-        <Card>
-          {recentActivity && recentActivity.length > 0 ? (
-            <ul className="divide-y divide-border">
-              {(recentActivity as (ActivityLogEntry & { profiles: { full_name: string } | null })[]).map(
-                (entry) => (
-                  <li key={entry.id} className="flex items-center justify-between px-5 py-3 text-sm">
-                    <div>
-                      <span className="font-medium text-foreground">
-                        {entry.profiles?.full_name ?? "Someone"}
-                      </span>{" "}
-                      <span className="text-muted">
-                        {entry.action.replace("_", " ")} a {entry.entity_type.replace("_", " ")}
-                      </span>
-                    </div>
-                    <span className="text-xs text-muted">{formatDateTime(entry.created_at)}</span>
-                  </li>
-                )
-              )}
-            </ul>
-          ) : (
-            <EmptyState message="No activity yet." />
-          )}
-        </Card>
-      </div>
 
       <div className="mt-8 flex gap-3">
         <Link href="/clients" className="text-sm font-medium text-foreground hover:underline">
