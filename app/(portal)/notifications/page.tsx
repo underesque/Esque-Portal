@@ -65,6 +65,24 @@ export default async function NotificationsPage() {
     });
   });
 
+  // --- Open tickets that need attention -------------------------------------
+  const { data: urgentTickets } = await supabase
+    .from("tickets")
+    .select("id, subject, priority")
+    .in("status", ["open", "in_progress"])
+    .in("priority", ["high", "urgent"]);
+
+  (urgentTickets ?? []).forEach((t) => {
+    items.push({
+      id: `ticket-${t.id}`,
+      severity: t.priority === "urgent" ? "overdue" : "due-soon",
+      icon: <AlertTriangle size={16} />,
+      title: `${t.priority === "urgent" ? "Urgent" : "High-priority"} ticket still open`,
+      detail: t.subject,
+      href: `/tickets/${t.id}`,
+    });
+  });
+
   if (isAdmin) {
     // --- Projects blocked by the client -------------------------------------
     const { data: blockedProjects } = await supabase

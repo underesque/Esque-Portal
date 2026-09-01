@@ -22,10 +22,15 @@ export function toMinorUnits(amount: number): number {
 
 export function formatDate(date: string | null): string {
   if (!date) return "—";
+  // Plain "YYYY-MM-DD" columns (due dates, holidays, scorecard periods) have
+  // no time component — they're parsed as UTC midnight, so format them back
+  // out in UTC too. Without this, a server running behind UTC renders every
+  // such date one day earlier than what's actually stored.
   return new Date(date).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 

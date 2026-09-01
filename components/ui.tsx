@@ -68,6 +68,14 @@ const BADGE_STYLES: Record<string, string> = {
   ongoing: "bg-sky-500/10 text-sky-700 ring-sky-600/20",
   completed: "bg-emerald-500/10 text-emerald-700 ring-emerald-600/20",
   blocked_by_client: "bg-brand-red/10 text-brand-red-dark ring-brand-red/25",
+  open: "bg-sky-500/10 text-sky-700 ring-sky-600/20",
+  in_progress: "bg-amber-500/10 text-amber-700 ring-amber-600/20",
+  resolved: "bg-emerald-500/10 text-emerald-700 ring-emerald-600/20",
+  closed: "bg-black/5 text-foreground/60 ring-black/10",
+  low: "bg-black/5 text-foreground/60 ring-black/10",
+  medium: "bg-sky-500/10 text-sky-700 ring-sky-600/20",
+  high: "bg-amber-500/10 text-amber-700 ring-amber-600/20",
+  urgent: "bg-brand-red/10 text-brand-red-dark ring-brand-red/25",
 };
 
 export function Badge({ status }: { status: string }) {

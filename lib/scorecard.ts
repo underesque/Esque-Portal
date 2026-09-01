@@ -48,3 +48,38 @@ export function yearlyScoreLabel(yearlyScore: number): string {
   const percent = incrementPercentForYearlyScore(yearlyScore);
   return percent > 0 ? `${percent}% increment` : "Below increment threshold";
 }
+
+export function monthBounds(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
+
+// Pure string-based month bounds for a "YYYY-MM-DD" date — used when rolling
+// daily entries up into a month, so the result never depends on the server's
+// local timezone the way parsing/reading a Date object can.
+export function monthBoundsForDateString(dateStr: string) {
+  const [year, month] = dateStr.split("-").map(Number);
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const end = new Date(Date.UTC(year, month, 0));
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
+
+export function isWeekday(dateStr: string): boolean {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return dow >= 1 && dow <= 5;
+}
+
+// Most recent weekday on/before `date` — the sensible default for a new
+// daily-entry form (today if it's a weekday, else the preceding Friday).
+// Built from local Y/M/D components throughout so the result reflects the
+// server's local "today", not a UTC-shifted one.
+export function mostRecentWeekday(date: Date): string {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  while (d.getDay() === 0 || d.getDay() === 6) {
+    d.setDate(d.getDate() - 1);
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}

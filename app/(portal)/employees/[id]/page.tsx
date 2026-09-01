@@ -8,48 +8,60 @@ import { PageHeader, Card, Badge, Button, Input, Select, Textarea, Label, EmptyS
 import { formatINR, formatDate, titleCase } from "@/lib/format";
 import { updateEmployee } from "@/lib/actions/employees";
 import { addCommissionEntry, updateCommissionStatus } from "@/lib/actions/payroll";
-import { saveMonthlyScorecard } from "@/lib/actions/scorecards";
-import { SCORECARD_CATEGORIES, calculateMonthlyScore, incrementPercentForYearlyScore } from "@/lib/scorecard";
-import type { CommissionEntry, Employee, MonthlyScorecard, PayrollRun, ProjectAssignment } from "@/lib/types";
-
-function monthBounds(date: Date) {
-  const start = new Date(date.getFullYear(), date.getMonth(), 1);
-  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
-}
+import { saveDailyScorecard, deleteDailyScorecard } from "@/lib/actions/scorecards";
+import {
+  SCORECARD_CATEGORIES,
+  calculateMonthlyScore,
+  incrementPercentForYearlyScore,
+  monthBounds,
+  mostRecentWeekday,
+} from "@/lib/scorecard";
+import type { CommissionEntry, DailyScorecard, Employee, MonthlyScorecard, PayrollRun, ProjectAssignment } from "@/lib/types";
 
 export default async function EmployeeDetailPage({ params }: PageProps<"/employees/[id]">) {
   await requireAdmin();
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: employee }, { data: commissionEntries }, { data: payrollRuns }, { data: scorecards }, { data: projectAssignments }] =
-    await Promise.all([
-      supabase.from("employees").select("*").eq("id", id).single<Employee>(),
-      supabase
-        .from("commission_entries")
-        .select("*")
-        .eq("employee_id", id)
-        .order("created_at", { ascending: false })
-        .returns<CommissionEntry[]>(),
-      supabase
-        .from("payroll_runs")
-        .select("*")
-        .eq("employee_id", id)
-        .order("period_start", { ascending: false })
-        .returns<PayrollRun[]>(),
-      supabase
-        .from("monthly_scorecards")
-        .select("*")
-        .eq("employee_id", id)
-        .order("period_start", { ascending: false })
-        .returns<MonthlyScorecard[]>(),
-      supabase
-        .from("project_assignments")
-        .select("*, projects(id, name, status, clients(name))")
-        .eq("employee_id", id)
-        .returns<(ProjectAssignment & { projects: { id: string; name: string; status: string; clients: { name: string } | null } | null })[]>(),
-    ]);
+  const [
+    { data: employee },
+    { data: commissionEntries },
+    { data: payrollRuns },
+    { data: scorecards },
+    { data: dailyScorecards },
+    { data: projectAssignments },
+  ] = await Promise.all([
+    supabase.from("employees").select("*").eq("id", id).single<Employee>(),
+    supabase
+      .from("commission_entries")
+      .select("*")
+      .eq("employee_id", id)
+      .order("created_at", { ascending: false })
+      .returns<CommissionEntry[]>(),
+    supabase
+      .from("payroll_runs")
+      .select("*")
+      .eq("employee_id", id)
+      .order("period_start", { ascending: false })
+      .returns<PayrollRun[]>(),
+    supabase
+      .from("monthly_scorecards")
+      .select("*")
+      .eq("employee_id", id)
+      .order("period_start", { ascending: false })
+      .returns<MonthlyScorecard[]>(),
+    supabase
+      .from("daily_scorecards")
+      .select("*")
+      .eq("employee_id", id)
+      .order("entry_date", { ascending: false })
+      .returns<DailyScorecard[]>(),
+    supabase
+      .from("project_assignments")
+      .select("*, projects(id, name, status, clients(name))")
+      .eq("employee_id", id)
+      .returns<(ProjectAssignment & { projects: { id: string; name: string; status: string; clients: { name: string } | null } | null })[]>(),
+  ]);
 
   if (!employee) notFound();
 
@@ -58,12 +70,16 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
     .reduce((sum, e) => sum + e.commission_amount_cents, 0);
 
   const scorecardRows = scorecards ?? [];
-  const { start: defaultMonthStart, end: defaultMonthEnd } = monthBounds(new Date());
+  const { start: defaultMonthStart } = monthBounds(new Date());
   const existingForThisMonth = scorecardRows.find((s) => s.period_start === defaultMonthStart);
   const currentYear = new Date().getFullYear();
   const thisYearScores = scorecardRows.filter((s) => Number(s.period_start.slice(0, 4)) === currentYear);
   const yearlyScore =
     thisYearScores.length > 0 ? thisYearScores.reduce((sum, s) => sum + calculateMonthlyScore(s), 0) / thisYearScores.length : null;
+
+  const dailyRows = dailyScorecards ?? [];
+  const defaultEntryDate = mostRecentWeekday(new Date());
+  const existingForDefaultDate = dailyRows.find((d) => d.entry_date === defaultEntryDate);
 
   return (
     <div>
@@ -422,19 +438,22 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                 </span>
               )}
             </div>
+
+            {existingForThisMonth && (
+              <p className="mb-4 text-xs text-muted">
+                This month&apos;s rollup (auto-computed): {calculateMonthlyScore(existingForThisMonth).toFixed(1)}%
+                {existingForThisMonth.notes ? ` — ${existingForThisMonth.notes}` : ""}
+              </p>
+            )}
+
+            <p className="mb-2 text-xs font-medium text-foreground">Daily entry (weekdays only)</p>
             <form
-              action={saveMonthlyScorecard.bind(null, employee.id)}
+              action={saveDailyScorecard.bind(null, employee.id)}
               className="mb-5 space-y-3 rounded-lg border border-border p-4"
             >
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <Label>Period start</Label>
-                  <Input name="period_start" type="date" required defaultValue={defaultMonthStart} />
-                </div>
-                <div>
-                  <Label>Period end</Label>
-                  <Input name="period_end" type="date" required defaultValue={defaultMonthEnd} />
-                </div>
+              <div>
+                <Label>Date</Label>
+                <Input name="entry_date" type="date" required defaultValue={defaultEntryDate} />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {SCORECARD_CATEGORIES.map((c) => (
@@ -448,7 +467,7 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
                       step="0.1"
                       min="0"
                       max="100"
-                      defaultValue={existingForThisMonth ? existingForThisMonth[c.key] : 100}
+                      defaultValue={existingForDefaultDate ? existingForDefaultDate[c.key] : 100}
                       required
                     />
                   </div>
@@ -456,34 +475,42 @@ export default async function EmployeeDetailPage({ params }: PageProps<"/employe
               </div>
               <div>
                 <Label>Notes</Label>
-                <Textarea name="notes" rows={2} defaultValue={existingForThisMonth?.notes ?? ""} />
+                <Textarea name="notes" rows={2} defaultValue={existingForDefaultDate?.notes ?? ""} />
               </div>
               <div className="flex justify-end">
                 <Button type="submit" variant="secondary">
-                  Save this month&apos;s scorecard
+                  Save this day&apos;s scorecard
                 </Button>
               </div>
             </form>
 
-            {scorecardRows.length > 0 ? (
+            {dailyRows.length > 0 ? (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs font-medium uppercase text-muted">
-                    <th className="py-2">Month</th>
+                    <th className="py-2">Date</th>
                     <th className="py-2">Overall score</th>
+                    <th className="py-2" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {scorecardRows.map((s) => (
-                    <tr key={s.id}>
-                      <td className="py-2 text-foreground">{formatDate(s.period_start)}</td>
-                      <td className="py-2 font-medium text-foreground">{calculateMonthlyScore(s).toFixed(1)}%</td>
+                  {dailyRows.map((d) => (
+                    <tr key={d.id}>
+                      <td className="py-2 text-foreground">{formatDate(d.entry_date)}</td>
+                      <td className="py-2 font-medium text-foreground">{calculateMonthlyScore(d).toFixed(1)}%</td>
+                      <td className="py-2 text-right">
+                        <form action={deleteDailyScorecard.bind(null, employee.id, d.id)}>
+                          <button type="submit" className="text-xs text-brand-red hover:underline">
+                            Delete
+                          </button>
+                        </form>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <EmptyState message="No scorecards entered yet." />
+              <EmptyState message="No daily entries yet." />
             )}
           </Card>
         </div>

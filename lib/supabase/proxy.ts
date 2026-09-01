@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const ADMIN_ONLY_ROUTES = ["/payroll", "/employees", "/founders", "/vendors"];
+const ADMIN_ONLY_ROUTES = ["/payroll", "/employees", "/founders", "/vendors", "/projects", "/scorecards"];
 // Employees get a deliberately narrow slice of the portal — their own
 // scorecard, and the company holiday calendar. Everything else redirects
 // them back to /my-scorecard, regardless of what ADMIN_ONLY_ROUTES allows.

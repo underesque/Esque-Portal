@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { SCORECARD_CATEGORIES, calculateMonthlyScore, incrementPercentForYearlyScore } from "@/lib/scorecard";
-import type { MonthlyScorecard } from "@/lib/types";
+import type { DailyScorecard, MonthlyScorecard } from "@/lib/types";
 
 export default async function MyScorecardPage() {
   const { profile, employeeId } = await requireEmployee();
@@ -16,8 +16,16 @@ export default async function MyScorecardPage() {
     .eq("employee_id", employeeId)
     .order("period_start", { ascending: false })
     .returns<MonthlyScorecard[]>();
+  const { data: dailyScorecards } = await supabase
+    .from("daily_scorecards")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .order("entry_date", { ascending: false })
+    .limit(20)
+    .returns<DailyScorecard[]>();
 
   const rows = scorecards ?? [];
+  const dailyRows = dailyScorecards ?? [];
   const currentYear = new Date().getFullYear();
   const thisYearRows = rows.filter((r) => Number(r.period_start.slice(0, 4)) === currentYear);
   const yearlyScore = thisYearRows.length > 0 ? thisYearRows.reduce((s, r) => s + calculateMonthlyScore(r), 0) / thisYearRows.length : null;
@@ -100,6 +108,32 @@ export default async function MyScorecardPage() {
             </table>
           ) : (
             <EmptyState message="No scorecards recorded yet. Check back after your first monthly review." />
+          )}
+        </Card>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-sm font-semibold text-foreground mb-3">Recent daily entries</h2>
+        <Card>
+          {dailyRows.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs font-medium uppercase text-muted">
+                  <th className="px-5 py-3">Date</th>
+                  <th className="px-5 py-3">Overall score</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {dailyRows.map((d) => (
+                  <tr key={d.id}>
+                    <td className="px-5 py-3 font-medium text-foreground">{formatDate(d.entry_date)}</td>
+                    <td className="px-5 py-3 tabular-nums">{calculateMonthlyScore(d).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <EmptyState message="No daily entries recorded yet." />
           )}
         </Card>
       </div>

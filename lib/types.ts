@@ -184,6 +184,20 @@ export interface MonthlyScorecard {
   updated_at: string;
 }
 
+export interface DailyScorecard {
+  id: string;
+  employee_id: string;
+  entry_date: string;
+  attendance_score: number;
+  punctuality_score: number;
+  work_performance_score: number;
+  manager_feedback_score: number;
+  responsiveness_score: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type PayoutShareCategory =
   | "sales"
   | "ops"
@@ -266,5 +280,33 @@ export interface ProjectAssignment {
   hourly_rate_cents: number | null;
   hours: number | null;
   fixed_contract_amount_cents: number | null;
+  created_at: string;
+}
+
+export type TicketType = "internal" | "client";
+export type TicketPriority = "low" | "medium" | "high" | "urgent";
+export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
+export interface Ticket {
+  id: string;
+  type: TicketType;
+  subject: string;
+  description: string | null;
+  priority: TicketPriority;
+  status: TicketStatus;
+  client_id: string | null;
+  about_employee_id: string | null;
+  assignee_id: string | null;
+  created_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketComment {
+  id: string;
+  ticket_id: string;
+  body: string;
+  created_by: string | null;
   created_at: string;
 }

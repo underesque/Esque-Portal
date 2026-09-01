@@ -15,6 +15,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   FolderKanban,
+  Ticket,
   LogOut,
   Menu,
   X,
@@ -26,8 +27,10 @@ import type { UserRole } from "@/lib/types";
 const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard; roles: UserRole[] }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "staff"] },
   { href: "/clients", label: "Clients", icon: Contact, roles: ["admin", "staff"] },
+  { href: "/tickets", label: "Tickets", icon: Ticket, roles: ["admin", "staff"] },
   { href: "/employees", label: "Employees", icon: Users, roles: ["admin"] },
   { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin"] },
+  { href: "/scorecards", label: "Scorecard", icon: ClipboardCheck, roles: ["admin"] },
   { href: "/payroll", label: "Payroll", icon: Wallet, roles: ["admin"] },
   { href: "/vendors", label: "Vendors", icon: Building, roles: ["admin"] },
   { href: "/my-scorecard", label: "My Scorecard", icon: ClipboardCheck, roles: ["employee"] },
