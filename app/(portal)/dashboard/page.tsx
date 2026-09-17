@@ -1,100 +1,106 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { PageHeader, StatCard } from "@/components/ui";
+import { TrendChart, BreakdownChart } from "@/components/charts";
 import { formatUSD, formatINR } from "@/lib/format";
+import { lastNMonths, sumByMonth } from "@/lib/dashboard";
 
 export default async function DashboardPage() {
-  const { profile } = await requireUser();
+  const { profile } = await requireAdmin();
   const supabase = await createClient();
-  const isAdmin = profile.role === "admin";
+  const months = lastNMonths(6);
+  const rangeStart = months[0].key + "-01";
+  const monthStart = new Date().toISOString().slice(0, 7) + "-01";
 
   const [
     { count: clientCount },
     { count: prospectCount },
+    { data: clientStatuses },
     { data: payments },
+    { data: recentPayments },
     { data: openInvoices },
     { count: activeEmployees },
+    { count: urgentTickets },
+    { count: activeProjects },
+    { data: payrollThisMonth },
   ] = await Promise.all([
     supabase.from("clients").select("id", { count: "exact", head: true }),
-    supabase
-      .from("clients")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "prospect"),
+    supabase.from("clients").select("id", { count: "exact", head: true }).eq("status", "prospect"),
+    supabase.from("clients").select("status"),
     supabase.from("payments").select("amount_cents"),
+    supabase.from("payments").select("amount_cents, payment_date").gte("payment_date", rangeStart),
+    supabase.from("invoices").select("amount_cents").in("status", ["sent", "overdue"]),
+    supabase.from("employees").select("id", { count: "exact", head: true }).eq("status", "active"),
     supabase
-      .from("invoices")
-      .select("amount_cents")
-      .in("status", ["sent", "overdue"]),
-    supabase
-      .from("employees")
+      .from("tickets")
       .select("id", { count: "exact", head: true })
-      .eq("status", "active"),
+      .in("status", ["open", "in_progress"])
+      .eq("priority", "urgent"),
+    supabase.from("projects").select("id", { count: "exact", head: true }).eq("status", "ongoing"),
+    supabase.from("payroll_runs").select("total_amount_cents").gte("period_start", monthStart),
   ]);
 
   const totalRevenueCents = (payments ?? []).reduce((sum, p) => sum + p.amount_cents, 0);
-  const pendingInvoiceCents = (openInvoices ?? []).reduce(
-    (sum, i) => sum + i.amount_cents,
-    0
-  );
+  const pendingInvoiceCents = (openInvoices ?? []).reduce((sum, i) => sum + i.amount_cents, 0);
+  const payrollCents = (payrollThisMonth ?? []).reduce((sum, r) => sum + r.total_amount_cents, 0);
 
-  let payrollSummary: string | null = null;
-  if (isAdmin) {
-    const { data: payrollRuns } = await supabase
-      .from("payroll_runs")
-      .select("total_amount_cents")
-      .gte(
-        "period_start",
-        new Date(new Date().setDate(1)).toISOString().slice(0, 10)
-      );
-    const total = (payrollRuns ?? []).reduce((sum, r) => sum + r.total_amount_cents, 0);
-    payrollSummary = formatINR(total);
-  }
+  const revenueByMonth = sumByMonth(
+    recentPayments ?? [],
+    months,
+    (p) => p.payment_date,
+    (p) => p.amount_cents
+  );
+  const revenueTrendData = months.map((m) => ({ label: m.label, value: revenueByMonth.get(m.key) ?? 0 }));
+
+  const statusCounts = { active: 0, prospect: 0, inactive: 0 };
+  (clientStatuses ?? []).forEach((c) => {
+    if (c.status in statusCounts) statusCounts[c.status as keyof typeof statusCounts] += 1;
+  });
+  const clientBreakdownData = [
+    { label: "Active", value: statusCounts.active },
+    { label: "Prospect", value: statusCounts.prospect },
+    { label: "Inactive", value: statusCounts.inactive },
+  ];
 
   return (
     <div>
       <PageHeader
         title={`Welcome back, ${profile.full_name.split(" ")[0]}`}
-        description="Here's what's happening across ESQUE right now."
+        description="Company-wide snapshot across every account."
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Total Clients"
-          value={String(clientCount ?? 0)}
-          hint={`${prospectCount ?? 0} prospects`}
-        />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <StatCard label="Total Clients" value={String(clientCount ?? 0)} hint={`${prospectCount ?? 0} prospects`} />
         <StatCard label="Revenue Collected" value={formatUSD(totalRevenueCents)} />
         <StatCard
           label="Pending Invoices"
           value={formatUSD(pendingInvoiceCents)}
           hint={`${(openInvoices ?? []).length} open`}
         />
-        {isAdmin ? (
-          <StatCard
-            label="Payroll (this month)"
-            value={payrollSummary ?? formatINR(0)}
-          />
-        ) : (
-          <StatCard label="Employees" value={String(activeEmployees ?? 0)} />
-        )}
+        <StatCard label="Payroll (this month)" value={formatINR(payrollCents)} />
       </div>
 
-      {isAdmin && (
-        <div className="mt-6 max-w-xs">
-          <StatCard label="Active Employees" value={String(activeEmployees ?? 0)} />
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+        <StatCard label="Active Employees" value={String(activeEmployees ?? 0)} />
+        <StatCard label="Ongoing Projects" value={String(activeProjects ?? 0)} />
+        <StatCard label="Urgent Open Tickets" value={String(urgentTickets ?? 0)} />
+      </div>
 
-      <div className="mt-8 flex gap-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-8">
+        <div className="lg:col-span-2">
+          <TrendChart title="Revenue collected — last 6 months" data={revenueTrendData} format="usd" />
+        </div>
+        <BreakdownChart title="Clients by status" data={clientBreakdownData} />
+      </div>
+
+      <div className="flex gap-3">
         <Link href="/clients" className="text-sm font-medium text-foreground hover:underline">
           View all clients →
         </Link>
-        {isAdmin && (
-          <Link href="/payroll" className="text-sm font-medium text-foreground hover:underline">
-            Go to payroll →
-          </Link>
-        )}
+        <Link href="/payroll" className="text-sm font-medium text-foreground hover:underline">
+          Go to payroll →
+        </Link>
       </div>
     </div>
   );

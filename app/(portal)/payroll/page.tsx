@@ -98,7 +98,7 @@ export default async function PayrollPage() {
               {(payrollRuns as (PayrollRun & { employees: { full_name: string } | null })[]).map((run) => (
                 <tr key={run.id}>
                   <td className="px-5 py-3">
-                    <Link href={`/employees/${run.employee_id}`} className="font-medium text-foreground hover:underline">
+                    <Link href={`/employees/${run.employee_id}?tab=payroll`} className="font-medium text-foreground hover:underline">
                       {run.employees?.full_name ?? "—"}
                     </Link>
                   </td>

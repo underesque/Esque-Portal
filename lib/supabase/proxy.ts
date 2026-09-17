@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const ADMIN_ONLY_ROUTES = ["/payroll", "/employees", "/founders", "/vendors", "/projects", "/scorecards"];
+// /dashboard covers its nested Sales/Support/Financial/Marketing tabs too
+// (/dashboard/sales, etc.) since this list is matched with startsWith.
+const ADMIN_ONLY_ROUTES = ["/payroll", "/employees", "/founders", "/vendors", "/projects", "/scorecards", "/dashboard"];
 // Employees get a deliberately narrow slice of the portal — their own
 // scorecard, and the company holiday calendar. Everything else redirects
 // them back to /my-scorecard, regardless of what ADMIN_ONLY_ROUTES allows.
@@ -57,7 +59,7 @@ export async function updateSession(request: NextRequest) {
 
   if (isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = role === "employee" ? "/my-scorecard" : "/dashboard";
+    url.pathname = role === "employee" ? "/my-scorecard" : role === "staff" ? "/my-dashboard" : "/dashboard";
     return NextResponse.redirect(url);
   }
 
@@ -72,7 +74,7 @@ export async function updateSession(request: NextRequest) {
 
   if (ADMIN_ONLY_ROUTES.some((route) => pathname.startsWith(route)) && role !== "admin") {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = role === "staff" ? "/my-dashboard" : "/login";
     return NextResponse.redirect(url);
   }
 

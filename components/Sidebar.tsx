@@ -25,7 +25,8 @@ import { logout } from "@/lib/actions/auth";
 import type { UserRole } from "@/lib/types";
 
 const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard; roles: UserRole[] }[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "staff"] },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
+  { href: "/my-dashboard", label: "My Dashboard", icon: LayoutDashboard, roles: ["staff"] },
   { href: "/clients", label: "Clients", icon: Contact, roles: ["admin", "staff"] },
   { href: "/tickets", label: "Tickets", icon: Ticket, roles: ["admin", "staff"] },
   { href: "/employees", label: "Employees", icon: Users, roles: ["admin"] },

@@ -58,7 +58,7 @@ export default async function ScorecardsPage() {
               {rows.map(({ employee, thisMonthScore, yearlyScore, monthsEntered }) => (
                 <tr key={employee.id} className="hover:bg-black/[0.02]">
                   <td className="px-5 py-3">
-                    <Link href={`/employees/${employee.id}`} className="font-medium text-foreground hover:underline">
+                    <Link href={`/employees/${employee.id}?tab=scorecard`} className="font-medium text-foreground hover:underline">
                       {employee.full_name}
                     </Link>
                   </td>
