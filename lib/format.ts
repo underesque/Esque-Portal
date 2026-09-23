@@ -1,5 +1,10 @@
-// Client billing (invoices, payments) is USD. Employee pay (salary, commission,
-// payroll runs) is INR. Both are stored as integer minor units (cents / paise).
+// Client billing is two different currencies on purpose: invoices are always
+// USD (what the client is actually billed). Payments are always INR — the
+// real amount Skydo credits to the bank after FX conversion and its fees,
+// which is a different number in a different currency from the invoice, not
+// a same-currency partial/full payment. Employee pay (salary, commission,
+// payroll runs) and the founder payout system are also INR. All amounts are
+// stored as integer minor units (cents / paise).
 
 export function formatUSD(cents: number): string {
   return (cents / 100).toLocaleString("en-US", {

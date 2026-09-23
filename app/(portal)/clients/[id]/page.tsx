@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { PageHeader, Card, Badge, Button, Input, Select, Textarea, Label, EmptyState } from "@/components/ui";
-import { formatUSD, formatDate, titleCase } from "@/lib/format";
+import { formatUSD, formatINR, formatDate, titleCase } from "@/lib/format";
 import {
   addClientAssignment,
   addClientPayoutSplit,
@@ -78,9 +78,15 @@ export default async function ClientDetailPage({ params }: PageProps<"/clients/[
     return acc;
   }, {});
 
+  // totalInvoicedCents/outstandingCents are USD (what's billed); totalPaidCents
+  // is INR — the real amount Skydo credited to the bank after FX + fees, a
+  // different currency from the invoice, so it can't be netted against
+  // totalInvoicedCents. "Outstanding" is derived from invoice status instead.
   const totalInvoicedCents = (invoices ?? []).reduce((sum, i) => sum + i.amount_cents, 0);
   const totalPaidCents = (payments ?? []).reduce((sum, p) => sum + p.amount_cents, 0);
-  const outstandingCents = totalInvoicedCents - totalPaidCents;
+  const outstandingCents = (invoices ?? [])
+    .filter((i) => i.status === "sent" || i.status === "overdue")
+    .reduce((sum, i) => sum + i.amount_cents, 0);
 
   return (
     <div>
@@ -345,12 +351,12 @@ export default async function ClientDetailPage({ params }: PageProps<"/clients/[
                 <dd className="font-medium text-foreground">{formatUSD(totalInvoicedCents)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted">Total paid</dt>
-                <dd className="font-medium text-foreground">{formatUSD(totalPaidCents)}</dd>
+                <dt className="text-muted">Total paid (cash collected)</dt>
+                <dd className="font-medium text-foreground">{formatINR(totalPaidCents)}</dd>
               </div>
               <div className="flex justify-between border-t border-border pt-2">
                 <dt className="text-muted">Outstanding</dt>
-                <dd className="font-semibold text-brand-red">{formatUSD(Math.max(outstandingCents, 0))}</dd>
+                <dd className="font-semibold text-brand-red">{formatUSD(outstandingCents)}</dd>
               </div>
             </dl>
           </Card>
@@ -494,8 +500,9 @@ export default async function ClientDetailPage({ params }: PageProps<"/clients/[
             >
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label>Amount (USD)</Label>
+                  <Label>Amount (INR)</Label>
                   <Input name="amount" type="number" step="0.01" min="0" required />
+                  <p className="mt-1 text-xs text-muted">Actual cash credited after FX/fees, not the USD invoice amount.</p>
                 </div>
                 <div>
                   <Label>Payment date</Label>
@@ -525,7 +532,7 @@ export default async function ClientDetailPage({ params }: PageProps<"/clients/[
                 <tbody className="divide-y divide-border">
                   {payments.map((payment) => (
                     <tr key={payment.id}>
-                      <td className="py-2 font-medium text-foreground">{formatUSD(payment.amount_cents)}</td>
+                      <td className="py-2 font-medium text-foreground">{formatINR(payment.amount_cents)}</td>
                       <td className="py-2 text-muted">{formatDate(payment.payment_date)}</td>
                       <td className="py-2 text-muted">{payment.method ? titleCase(payment.method) : "—"}</td>
                     </tr>

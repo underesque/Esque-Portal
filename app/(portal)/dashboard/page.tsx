@@ -17,8 +17,8 @@ export default async function DashboardPage() {
     { count: clientCount },
     { count: prospectCount },
     { data: clientStatuses },
-    { data: payments },
-    { data: recentPayments },
+    { data: paidInvoices },
+    { data: recentPaidInvoices },
     { data: openInvoices },
     { count: activeEmployees },
     { count: urgentTickets },
@@ -28,8 +28,8 @@ export default async function DashboardPage() {
     supabase.from("clients").select("id", { count: "exact", head: true }),
     supabase.from("clients").select("id", { count: "exact", head: true }).eq("status", "prospect"),
     supabase.from("clients").select("status"),
-    supabase.from("payments").select("amount_cents"),
-    supabase.from("payments").select("amount_cents, payment_date").gte("payment_date", rangeStart),
+    supabase.from("invoices").select("amount_cents").eq("status", "paid"),
+    supabase.from("invoices").select("amount_cents, paid_at").eq("status", "paid").gte("paid_at", rangeStart),
     supabase.from("invoices").select("amount_cents").in("status", ["sent", "overdue"]),
     supabase.from("employees").select("id", { count: "exact", head: true }).eq("status", "active"),
     supabase
@@ -41,15 +41,19 @@ export default async function DashboardPage() {
     supabase.from("payroll_runs").select("total_amount_cents").gte("period_start", monthStart),
   ]);
 
-  const totalRevenueCents = (payments ?? []).reduce((sum, p) => sum + p.amount_cents, 0);
+  // Revenue is tracked off paid invoices (always USD, what was actually
+  // billed), not the payments table — payments record the real INR amount
+  // credited to the bank after Skydo's FX conversion/fees, a different
+  // currency entirely, so they can't be summed as USD revenue.
+  const totalRevenueCents = (paidInvoices ?? []).reduce((sum, i) => sum + i.amount_cents, 0);
   const pendingInvoiceCents = (openInvoices ?? []).reduce((sum, i) => sum + i.amount_cents, 0);
   const payrollCents = (payrollThisMonth ?? []).reduce((sum, r) => sum + r.total_amount_cents, 0);
 
   const revenueByMonth = sumByMonth(
-    recentPayments ?? [],
+    recentPaidInvoices ?? [],
     months,
-    (p) => p.payment_date,
-    (p) => p.amount_cents
+    (i) => i.paid_at ?? "",
+    (i) => i.amount_cents
   );
   const revenueTrendData = months.map((m) => ({ label: m.label, value: revenueByMonth.get(m.key) ?? 0 }));
 

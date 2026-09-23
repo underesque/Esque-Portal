@@ -78,7 +78,9 @@ links directly to the DB, not just the REST API).
 Eleven migrations in `supabase/migrations/`, **must run in exact numeric order**:
 
 - **`0001_init.sql`** — core schema: `profiles` (role: admin/staff), `clients`,
-  `client_communications`, `invoices`, `payments` (client billing — always USD), `employees`,
+  `client_communications`, `invoices` (always USD — what's billed), `payments` (always INR — the
+  real amount Skydo credits to the bank after FX conversion/fees, a different currency from the
+  invoice it's for, not a same-currency partial payment), `employees`,
   `commission_rules`, `commission_entries`, `payroll_runs` (employee pay — always INR),
   `activity_log`.
 - **`0002_founders_vendors_holidays.sql`** — the original `founder_assignments`/
@@ -120,7 +122,8 @@ Eleven migrations in `supabase/migrations/`, **must run in exact numeric order**
 - **Role-based access** — `admin` (everything), `staff` (clients/billing, not compensation),
   `employee` (their own performance scorecard only).
 - **Clients** (`/clients`) — records with real business context (name/email/notes), communication
-  timeline, invoices (USD; optionally tagged to a project/"seat"), payments, an editable Sales/Ops
+  timeline, invoices (USD; optionally tagged to a project/"seat"), payments (INR — real cash
+  credited, not the USD invoice amount), an editable Sales/Ops
   owner pair, a **Team card** (assigned employees + an employment-type breakdown), a **Projects
   card** split into Monthly/Special sections, and a payout-settings form (Ops owner, Foundation
   Account flag, default payout type, fixed monthly payout base). **Custom payout splits** can be
@@ -216,10 +219,16 @@ Eleven migrations in `supabase/migrations/`, **must run in exact numeric order**
   reads it back in local time, which silently shifts the month on any server running behind UTC.
   Fixed in the payout month-bounds calculation and two scorecard year filters — if you add another
   month/year boundary calculation, do the arithmetic in UTC from the start.
-- **Money conventions are load-bearing, not stylistic.** Client billing (invoices/payments) is
-  always USD (`_cents`); employee pay, payroll, vendors, and everything in the founder payout
-  system is always INR (`_inr_cents`). Mixing these up would be a real financial bug, not a
-  formatting inconsistency.
+- **Money conventions are load-bearing, not stylistic — and `invoices` vs `payments` are
+  deliberately two different currencies, not a bug.** `invoices.amount_cents` is always USD (what
+  the client is billed — this is also what the founder payout engine converts to INR via each
+  invoice's own `conversion_rate`; it never reads `payments`). `payments.amount_cents` is always
+  INR — the real amount Skydo actually credits to ESQUE's bank account after FX conversion and its
+  fees, which is a smaller, different-currency number from the invoice it's for, not a
+  same-currency partial/full payment against it. Employee pay, payroll, vendors, and the founder
+  payout system are also always INR. Any code that sums `payments` and formats it as USD (or vice
+  versa) is wrong — this exact mistake shipped once (dashboards summed `payments` and displayed it
+  with `formatUSD`) before being caught and fixed.
 - **Rounding uses largest-remainder distribution (`splitProportional` in `lib/founderPayout.ts`),
   not naive per-share rounding** — needed because splitting an integer paise amount N ways by
   simple `Math.round()` on each share can lose or gain a paisa vs. the original total. Reuse this

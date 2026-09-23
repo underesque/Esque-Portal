@@ -28,21 +28,23 @@ export default async function FinancialDashboardPage() {
   const todayStr = today.toISOString().slice(0, 10);
 
   const [
-    { data: recentPayments },
-    { data: monthPayments },
+    { data: recentPaidInvoices },
+    { data: monthPaidInvoices },
     { data: openInvoices },
-    { data: clientPayments },
+    { data: clientPaidInvoices },
     { data: clients },
+    { data: monthCashInr },
     { data: payrollRuns },
     { data: payoutRuns },
     { data: currentMonthRun },
     { data: vendors },
   ] = await Promise.all([
-    supabase.from("payments").select("amount_cents, payment_date").gte("payment_date", rangeStart),
-    supabase.from("payments").select("amount_cents").gte("payment_date", monthStart),
+    supabase.from("invoices").select("amount_cents, paid_at").eq("status", "paid").gte("paid_at", rangeStart),
+    supabase.from("invoices").select("amount_cents").eq("status", "paid").gte("paid_at", monthStart),
     supabase.from("invoices").select("amount_cents").in("status", ["sent", "overdue"]),
-    supabase.from("payments").select("amount_cents, client_id"),
+    supabase.from("invoices").select("amount_cents, client_id").eq("status", "paid"),
     supabase.from("clients").select("id, name, sales_owner_id, employees!sales_owner_id(full_name)"),
+    supabase.from("payments").select("amount_cents").gte("payment_date", monthStart),
     supabase.from("payroll_runs").select("period_start, total_amount_cents").gte("period_start", rangeStart),
     supabase.from("payout_runs").select("id, period_start").gte("period_start", rangeStart),
     supabase.from("payout_runs").select("id").eq("period_start", monthStart).maybeSingle(),
@@ -56,22 +58,28 @@ export default async function FinancialDashboardPage() {
       .returns<Vendor[]>(),
   ]);
 
-  // --- Revenue ---------------------------------------------------------
-  const revenueThisMonthCents = (monthPayments ?? []).reduce((sum, p) => sum + p.amount_cents, 0);
+  // --- Revenue -----------------------------------------------------------
+  // Tracked off paid invoices (always USD, what was actually billed), not
+  // the payments table — payments record the real INR amount credited to
+  // the bank after Skydo's FX conversion/fees, a different currency
+  // entirely from the invoice, so they can't be summed as USD revenue.
+  // "Cash collected" below is the payments-table figure instead, on purpose.
+  const revenueThisMonthCents = (monthPaidInvoices ?? []).reduce((sum, i) => sum + i.amount_cents, 0);
   const outstandingCents = (openInvoices ?? []).reduce((sum, i) => sum + i.amount_cents, 0);
+  const cashCollectedInrCentsThisMonth = (monthCashInr ?? []).reduce((sum, p) => sum + p.amount_cents, 0);
 
   const revenueByMonth = sumByMonth(
-    recentPayments ?? [],
+    recentPaidInvoices ?? [],
     months,
-    (p) => p.payment_date,
-    (p) => p.amount_cents
+    (i) => i.paid_at ?? "",
+    (i) => i.amount_cents
   );
   const revenueTrendData = months.map((m) => ({ label: m.label, value: revenueByMonth.get(m.key) ?? 0 }));
 
   const clientById = new Map((clients ?? []).map((c) => [c.id, c]));
   const revenueByClient = new Map<string, number>();
-  (clientPayments ?? []).forEach((p) => {
-    revenueByClient.set(p.client_id, (revenueByClient.get(p.client_id) ?? 0) + p.amount_cents);
+  (clientPaidInvoices ?? []).forEach((i) => {
+    revenueByClient.set(i.client_id, (revenueByClient.get(i.client_id) ?? 0) + i.amount_cents);
   });
   const topClients = Array.from(revenueByClient.entries())
     .map(([clientId, cents]) => ({ client: clientById.get(clientId), cents }))
@@ -80,10 +88,10 @@ export default async function FinancialDashboardPage() {
     .slice(0, 8);
 
   const revenueBySalesOwner = new Map<string, number>();
-  (clientPayments ?? []).forEach((p) => {
-    const client = clientById.get(p.client_id);
+  (clientPaidInvoices ?? []).forEach((i) => {
+    const client = clientById.get(i.client_id);
     const ownerName = (client?.employees as unknown as { full_name: string } | null)?.full_name ?? "Unattributed";
-    revenueBySalesOwner.set(ownerName, (revenueBySalesOwner.get(ownerName) ?? 0) + p.amount_cents);
+    revenueBySalesOwner.set(ownerName, (revenueBySalesOwner.get(ownerName) ?? 0) + i.amount_cents);
   });
   const salesOwnerBreakdown = Array.from(revenueBySalesOwner.entries())
     .sort((a, b) => b[1] - a[1])
@@ -138,9 +146,14 @@ export default async function FinancialDashboardPage() {
 
       <div className="mb-10">
         <h2 className="text-sm font-semibold text-foreground mb-3">Revenue</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-6">
           <StatCard label="Revenue (this month)" value={formatUSD(revenueThisMonthCents)} />
           <StatCard label="Outstanding invoices" value={formatUSD(outstandingCents)} hint={`${(openInvoices ?? []).length} open`} />
+          <StatCard
+            label="Cash collected (this month)"
+            value={formatINR(cashCollectedInrCentsThisMonth)}
+            hint="Net of Skydo FX + fees"
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
