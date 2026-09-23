@@ -1,14 +1,20 @@
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, StatCard, EmptyState } from "@/components/ui";
-import { BreakdownChart } from "@/components/charts";
+import { BreakdownChart, TrendChart } from "@/components/charts";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { resolveRange, bucketsForRange, sumByBucket, isRangeKey, DEFAULT_RANGE } from "@/lib/dashboard";
 import type { Ticket } from "@/lib/types";
 
 type TicketRow = Ticket & { employees: { full_name: string } | null };
 
-export default async function SupportDashboardPage() {
+export default async function SupportDashboardPage({ searchParams }: PageProps<"/dashboard/support">) {
   await requireAdmin();
   const supabase = await createClient();
+  const sp = await searchParams;
+  const rangeParam = Array.isArray(sp.range) ? sp.range[0] : sp.range;
+  const range = resolveRange(isRangeKey(rangeParam) ? rangeParam : DEFAULT_RANGE);
+  const buckets = bucketsForRange(range);
 
   const { data: tickets } = await supabase
     .from("tickets")
@@ -16,11 +22,15 @@ export default async function SupportDashboardPage() {
     .returns<TicketRow[]>();
 
   const rows = tickets ?? [];
+  // Open/in-progress/urgent counts are current state, not time-scoped — the
+  // range filter only affects things with a real "in this period" meaning
+  // (resolved count, created trend), same convention as the other dashboards.
   const open = rows.filter((t) => t.status === "open").length;
   const inProgress = rows.filter((t) => t.status === "in_progress").length;
   const urgentOpen = rows.filter((t) => t.priority === "urgent" && (t.status === "open" || t.status === "in_progress")).length;
-  const monthStart = new Date().toISOString().slice(0, 7) + "-01";
-  const resolvedThisMonth = rows.filter((t) => t.resolved_at && t.resolved_at.slice(0, 10) >= monthStart).length;
+  const resolvedInRange = rows.filter(
+    (t) => t.resolved_at && t.resolved_at.slice(0, 10) >= range.startISO && t.resolved_at.slice(0, 10) < range.endExclusiveISO
+  ).length;
 
   const statusBreakdown = [
     { label: "Open", value: rows.filter((t) => t.status === "open").length },
@@ -35,6 +45,17 @@ export default async function SupportDashboardPage() {
     { label: "Urgent", value: rows.filter((t) => t.priority === "urgent").length },
   ];
 
+  const createdInRange = rows.filter(
+    (t) => t.created_at.slice(0, 10) >= range.startISO && t.created_at.slice(0, 10) < range.endExclusiveISO
+  );
+  const createdByBucket = sumByBucket(
+    createdInRange,
+    buckets,
+    (t) => t.created_at,
+    () => 1
+  );
+  const createdTrendData = buckets.map((b) => ({ label: b.label, value: createdByBucket.get(b.key) ?? 0 }));
+
   const openTickets = rows.filter((t) => t.status === "open" || t.status === "in_progress");
   const workloadByAssignee = new Map<string, number>();
   openTickets.forEach((t) => {
@@ -47,11 +68,17 @@ export default async function SupportDashboardPage() {
     <div>
       <PageHeader title="Support Dashboard" description="Ticket volume, priority mix, and team workload." />
 
+      <DateRangeFilter />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         <StatCard label="Open" value={String(open)} />
         <StatCard label="In progress" value={String(inProgress)} />
         <StatCard label="Urgent open" value={String(urgentOpen)} />
-        <StatCard label="Resolved this month" value={String(resolvedThisMonth)} />
+        <StatCard label={`Resolved (${range.label.toLowerCase()})`} value={String(resolvedInRange)} />
+      </div>
+
+      <div className="mb-8">
+        <TrendChart title={`Tickets created — ${range.label.toLowerCase()}`} data={createdTrendData} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 mb-8">
