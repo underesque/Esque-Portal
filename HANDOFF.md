@@ -6,11 +6,15 @@ Router + Supabase. Repo: [github.com/underesque/Esque-Portal](https://github.com
 
 ## Where things stand — read this first
 
-**Live in production.** Supabase is fully migrated (19 migrations — `npx supabase migration list --linked`
-to confirm) and the app is deployed on Hostinger at `crm.underesque.in`. Deploying there is **not**
-git-push-to-auto-deploy: after pushing, you have to go into Hostinger's hPanel Node.js app panel,
-pull the latest commit, run its "Run NPM Build" step, then restart the app. See the Hostinger
-gotcha below for why the build step specifically (not just a restart) is required.
+**Pushed to GitHub, not yet deployed to Hostinger.** `master` is up to date (commit `b311118` as of
+this handoff — check `git log -1` for the actual current head) and Supabase is fully migrated (19
+migrations — `npx supabase migration list --linked` to confirm), but the user has explicitly not
+yet done the Hostinger-side deploy step for this latest push. **Do not assume `crm.underesque.in`
+reflects the current `master`** — verify by checking the live site or asking, rather than treating
+a `git push` as equivalent to "shipped." Deploying there is **not** git-push-to-auto-deploy: it
+needs going into Hostinger's hPanel Node.js app panel, pulling the latest commit, running its "Run
+NPM Build" step, then restarting the app. See the Hostinger gotcha below for why the build step
+specifically (not just a restart) is required.
 
 **Real business data, not seed rows** — as of this handoff:
 - 12 employees, including 3 founders (Ruchit Sisodiya, Harshit, Tanveer — check `/employees` for
